@@ -91,9 +91,9 @@ def fetch_market_data(
     # Sort by Date and Symbol for consistent ordering
     aligned_data = aligned_data.sort_values(['Date', 'Symbol']).reset_index(drop=True)
     
-    # Forward fill any remaining NaN values in OHLC
+    # Forward fill any remaining NaN values in OHLC using new pandas syntax
     for col in ['Open', 'High', 'Low', 'Close']:
-        aligned_data[col] = aligned_data.groupby('Symbol')[col].fillna(method='ffill').fillna(method='bfill')
+        aligned_data[col] = aligned_data.groupby('Symbol')[col].transform(lambda x: x.ffill().bfill())
     
     return aligned_data
 
@@ -123,10 +123,10 @@ def prepare_panel_data(df: pd.DataFrame) -> tuple:
     pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume", aggfunc='first')
     pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open", aggfunc='first')
     
-    # Forward fill for missing data within each symbol, then backward fill
-    pivot_close = pivot_close.fillna(method='ffill').fillna(method='bfill')
+    # Forward fill for missing data within each symbol, then backward fill (new pandas syntax)
+    pivot_close = pivot_close.ffill().bfill()
     pivot_volume = pivot_volume.fillna(0)
-    pivot_open = pivot_open.fillna(method='ffill').fillna(method='bfill')
+    pivot_open = pivot_open.ffill().bfill()
     
     # Remove any remaining NaN rows
     valid_idx = ~(pivot_close.isna().any(axis=1) | pivot_open.isna().any(axis=1))
