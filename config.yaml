@@ -1,0 +1,13 @@
+data:
+  source: synthetic
+  symbol: TEST
+  start_date: "2023-01-01"
+  end_date: "2025-01-01"
+strategy:
+  short_window: 10
+  long_window: 30
+  position_limit: 0.25
+  risk_per_trade: 0.01
+risk:
+  max_drawdown: 0.3
+  target_sharpe: 1.5
