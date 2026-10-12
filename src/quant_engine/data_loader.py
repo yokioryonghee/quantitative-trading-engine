@@ -42,44 +42,58 @@ def fetch_market_data(
     
     print(f"Fetching data for {len(symbols)} symbols from {start_date} to {end_date}...")
     
-    data_dict = {}
+    data_list = []
+    successful_symbols = []
+    
     for symbol in symbols:
         try:
             df = yf.download(symbol, start=start_date, end=end_date, progress=False)
-            if not df.empty:
-                data_dict[symbol] = df
+            if df.empty:
+                print(f"✗ {symbol}: No data")
+                continue
+            
+            # Reset index to convert Date from index to column
+            df = df.reset_index()
+            
+            # Standardize column names to lowercase
+            df.columns = [col.lower() for col in df.columns]
+            
+            # Create normalized dataframe with required columns only
+            normalized = pd.DataFrame({
+                'Date': pd.to_datetime(df['date']),
+                'Open': pd.to_numeric(df.get('open', np.nan), errors='coerce'),
+                'High': pd.to_numeric(df.get('high', np.nan), errors='coerce'),
+                'Low': pd.to_numeric(df.get('low', np.nan), errors='coerce'),
+                'Close': pd.to_numeric(df.get('close', np.nan), errors='coerce'),
+                'Volume': pd.to_numeric(df.get('volume', 0), errors='coerce').fillna(0),
+                'Symbol': symbol
+            })
+            
+            # Drop any rows with missing price data
+            normalized = normalized.dropna(subset=['Close'])
+            
+            if len(normalized) > 0:
+                data_list.append(normalized)
+                successful_symbols.append(symbol)
                 print(f"✓ {symbol}")
             else:
-                print(f"✗ {symbol}: No data")
+                print(f"✗ {symbol}: No valid price data")
+                
         except Exception as e:
             print(f"✗ {symbol}: {str(e)[:50]}")
     
-    if not data_dict:
+    if not data_list:
         raise ValueError("No data fetched. Check symbols and internet connection.")
     
-    # Normalize and align all data
-    aligned_list = []
-    for sym, df in data_dict.items():
-        df_copy = df.reset_index()
-        
-        # Standardize column names
-        df_copy.columns = [col.lower() for col in df_copy.columns]
-        
-        # Extract only required columns, handle missing ones
-        df_normalized = pd.DataFrame()
-        df_normalized['Date'] = pd.to_datetime(df_copy['date'])
-        df_normalized['Open'] = df_copy.get('open', np.nan)
-        df_normalized['High'] = df_copy.get('high', np.nan)
-        df_normalized['Low'] = df_copy.get('low', np.nan)
-        df_normalized['Close'] = df_copy.get('close', np.nan)
-        df_normalized['Volume'] = df_copy.get('volume', 0.0)
-        df_normalized['Symbol'] = sym
-        
-        aligned_list.append(df_normalized)
+    # Concatenate all data
+    aligned_data = pd.concat(data_list, ignore_index=True)
     
-    # Concatenate all normalized data
-    aligned_data = pd.concat(aligned_list, ignore_index=True)
+    # Sort by Date and Symbol for consistent ordering
     aligned_data = aligned_data.sort_values(['Date', 'Symbol']).reset_index(drop=True)
+    
+    # Forward fill any remaining NaN values in OHLC
+    for col in ['Open', 'High', 'Low', 'Close']:
+        aligned_data[col] = aligned_data.groupby('Symbol')[col].fillna(method='ffill').fillna(method='bfill')
     
     return aligned_data
 
@@ -97,19 +111,31 @@ def get_optimal_universe() -> list[str]:
 def prepare_panel_data(df: pd.DataFrame) -> tuple:
     """
     Convert aligned data into panel format (Date x Symbol).
+    
+    Args:
+        df: DataFrame with Date, Close, Volume, Open, Symbol columns
+    
+    Returns:
+        Tuple of (pivot_close, pivot_volume, pivot_open) - all aligned
     """
-    pivot_close = df.pivot_table(index="Date", columns="Symbol", values="Close")
-    pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume")
-    pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open")
+    # Create pivot tables
+    pivot_close = df.pivot_table(index="Date", columns="Symbol", values="Close", aggfunc='first')
+    pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume", aggfunc='first')
+    pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open", aggfunc='first')
     
-    # Forward fill for gaps, then backward fill (handle leading/trailing NaNs)
-    pivot_close = pivot_close.ffill().bfill()
+    # Forward fill for missing data within each symbol, then backward fill
+    pivot_close = pivot_close.fillna(method='ffill').fillna(method='bfill')
     pivot_volume = pivot_volume.fillna(0)
-    pivot_open = pivot_open.ffill().bfill()
+    pivot_open = pivot_open.fillna(method='ffill').fillna(method='bfill')
     
-    # Remove any rows with NaN values
-    pivot_close = pivot_close.dropna()
+    # Remove any remaining NaN rows
+    valid_idx = ~(pivot_close.isna().any(axis=1) | pivot_open.isna().any(axis=1))
+    pivot_close = pivot_close[valid_idx]
     pivot_volume = pivot_volume.loc[pivot_close.index]
     pivot_open = pivot_open.loc[pivot_close.index]
+    
+    # Ensure all have at least 100 trading days
+    if len(pivot_close) < 100:
+        raise ValueError(f"Insufficient data: only {len(pivot_close)} trading days available (need at least 100)")
     
     return pivot_close, pivot_volume, pivot_open
