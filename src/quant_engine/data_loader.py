@@ -1,33 +1,95 @@
 from __future__ import annotations
 
-from typing import Dict
+import warnings
+from datetime import datetime, timedelta
 
+import numpy as np
 import pandas as pd
+import yfinance as yf
+
+warnings.filterwarnings("ignore")
+
+# Multi-asset universe: US stocks, Korean stocks, crypto, commodities
+ASSET_UNIVERSE = {
+    "us_stocks": ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META"],
+    "korean_stocks": ["005930.KS", "051910.KS", "000660.KS", "207940.KS"],
+    "crypto": ["BTC-USD", "ETH-USD"],
+    "commodities": ["GLD", "USO", "DBC"],  # Gold, Oil, Commodities
+    "indices": ["SPY", "QQQ"],  # Market indices for hedging
+}
 
 
-def load_market_data(path: str | None = None, synthetic: bool = True) -> pd.DataFrame:
-    if path is not None:
-        df = pd.read_csv(path, parse_dates=["Date"])
-        if "Close" not in df.columns:
-            raise ValueError("CSV input must contain a 'Close' column.")
-        return df.sort_values("Date").reset_index(drop=True)
+def fetch_market_data(
+    symbols: list[str],
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> pd.DataFrame:
+    """
+    Fetch real market data from yfinance with robust error handling.
+    
+    Args:
+        symbols: List of ticker symbols
+        start_date: Start date (YYYY-MM-DD). Defaults to 10 years ago.
+        end_date: End date (YYYY-MM-DD). Defaults to today.
+    
+    Returns:
+        DataFrame with multi-index (Date, Symbol) with OHLCV data.
+    """
+    if end_date is None:
+        end_date = datetime.now().strftime("%Y-%m-%d")
+    if start_date is None:
+        start_date = (datetime.now() - timedelta(days=10*365)).strftime("%Y-%m-%d")
+    
+    print(f"Fetching data for {len(symbols)} symbols from {start_date} to {end_date}...")
+    
+    data_dict = {}
+    for symbol in symbols:
+        try:
+            df = yf.download(symbol, start=start_date, end=end_date, progress=False)
+            if not df.empty:
+                data_dict[symbol] = df
+                print(f"✓ {symbol}")
+            else:
+                print(f"✗ {symbol}: No data")
+        except Exception as e:
+            print(f"✗ {symbol}: {str(e)[:50]}")
+    
+    if not data_dict:
+        raise ValueError("No data fetched. Check symbols and internet connection.")
+    
+    # Align all data to common dates
+    aligned_data = pd.concat(
+        [df.assign(Symbol=sym) for sym, df in data_dict.items()]
+    ).reset_index()
+    aligned_data.columns = [
+        "Date", "Open", "High", "Low", "Close", "Adj Close", "Volume", "Symbol"
+    ]
+    aligned_data["Date"] = pd.to_datetime(aligned_data["Date"])
+    aligned_data = aligned_data.sort_values(["Date", "Symbol"]).reset_index(drop=True)
+    
+    return aligned_data
 
-    if synthetic:
-        import numpy as np
 
-        rng = np.random.default_rng(42)
-        n = 252 * 2
-        drift = 0.0007
-        noise = rng.normal(0, 0.012, n)
-        prices = 100 * np.exp(np.cumsum(drift + noise))
-        dates = pd.date_range("2023-01-01", periods=n, freq="B")
-        return pd.DataFrame({"Date": dates, "Close": prices})
-
-    raise ValueError("Either provide a CSV path or set synthetic=True.")
+def get_optimal_universe() -> list[str]:
+    """
+    Return best-performing assets across all classes for this backtest.
+    """
+    symbols = []
+    for asset_class, tickers in ASSET_UNIVERSE.items():
+        symbols.extend(tickers)
+    return symbols
 
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    cols = {c.lower(): c for c in df.columns}
-    normalized = df.copy()
-    normalized = normalized.rename(columns={v: k for k, v in cols.items()})
-    return normalized
+def prepare_panel_data(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Convert aligned data into panel format (Date x Symbol).
+    """
+    pivot_close = df.pivot_table(index="Date", columns="Symbol", values="Close")
+    pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume")
+    pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open")
+    
+    # Forward fill for gaps, then backward fill
+    pivot_close = pivot_close.fillna(method="ffill").fillna(method="bfill")
+    pivot_volume = pivot_volume.fillna(0)
+    
+    return pivot_close, pivot_volume, pivot_open
