@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-import warnings
 from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
 
-warnings.filterwarnings("ignore")
 
 # Multi-asset universe: US stocks, Korean stocks, crypto, commodities
 ASSET_UNIVERSE = {
@@ -17,6 +15,24 @@ ASSET_UNIVERSE = {
     "commodities": ["GLD", "USO", "DBC"],  # Gold, Oil, Commodities
     "indices": ["SPY", "QQQ"],  # Market indices for hedging
 }
+
+
+def normalize_download(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
+    """Normalize flat and either ordering of yfinance MultiIndex columns."""
+    df = df.copy()
+    if isinstance(df.columns, pd.MultiIndex):
+        for level in range(df.columns.nlevels):
+            if symbol in df.columns.get_level_values(level):
+                df = df.xs(symbol, level=level, axis=1)
+                break
+        if isinstance(df.columns, pd.MultiIndex):
+            raise ValueError(f"Cannot identify OHLC columns for {symbol}")
+    df.columns = [str(col).lower() for col in df.columns]
+    if "close" not in df.columns or "open" not in df.columns:
+        raise ValueError(f"Missing Open/Close columns for {symbol}")
+    df.index = pd.to_datetime(df.index).tz_localize(None)
+    df.index.name = "Date"
+    return df
 
 
 def fetch_market_data(
@@ -42,18 +58,22 @@ def fetch_market_data(
     
     print(f"Fetching data for {len(symbols)} symbols from {start_date} to {end_date}...")
     
+    if not symbols:
+        raise ValueError("At least one symbol is required")
     data_list = []
+    failures = []
     successful_symbols = []
     
     for symbol in symbols:
         try:
-            df = yf.download(symbol, start=start_date, end=end_date, progress=False)
-            if df.empty:
+            df = yf.download(symbol, start=start_date, end=end_date, progress=False, auto_adjust=True, multi_level_index=False, timeout=20)
+            if df is None or df.empty:
+                failures.append(f"{symbol}: no data returned")
                 print(f"✗ {symbol}: No data")
                 continue
             
             # Reset index to convert Date from index to column
-            df = df.reset_index()
+            df = normalize_download(df, symbol).reset_index()
             
             # Standardize column names to lowercase
             df.columns = [col.lower() for col in df.columns]
@@ -65,7 +85,7 @@ def fetch_market_data(
                 'High': pd.to_numeric(df.get('high', np.nan), errors='coerce'),
                 'Low': pd.to_numeric(df.get('low', np.nan), errors='coerce'),
                 'Close': pd.to_numeric(df.get('close', np.nan), errors='coerce'),
-                'Volume': pd.to_numeric(df.get('volume', 0), errors='coerce').fillna(0),
+                'Volume': pd.to_numeric(df.get('volume', pd.Series(0, index=df.index)), errors='coerce').fillna(0),
                 'Symbol': symbol
             })
             
@@ -80,10 +100,11 @@ def fetch_market_data(
                 print(f"✗ {symbol}: No valid price data")
                 
         except Exception as e:
-            print(f"✗ {symbol}: {str(e)[:50]}")
+            failures.append(f"{symbol}: {e}")
+            print(f"✗ {symbol}: {e}")
     
     if not data_list:
-        raise ValueError("No data fetched. Check symbols and internet connection.")
+        raise ValueError("No data fetched: " + "; ".join(failures))
     
     # Concatenate all data
     aligned_data = pd.concat(data_list, ignore_index=True)
@@ -93,7 +114,7 @@ def fetch_market_data(
     
     # Forward fill any remaining NaN values in OHLC using new pandas syntax
     for col in ['Open', 'High', 'Low', 'Close']:
-        aligned_data[col] = aligned_data.groupby('Symbol')[col].transform(lambda x: x.ffill().bfill())
+        aligned_data[col] = aligned_data.groupby('Symbol')[col].transform(lambda x: x.ffill())
     
     return aligned_data
 
@@ -123,18 +144,20 @@ def prepare_panel_data(df: pd.DataFrame) -> tuple:
     pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume", aggfunc='first')
     pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open", aggfunc='first')
     
-    # Forward fill for missing data within each symbol, then backward fill (new pandas syntax)
-    pivot_close = pivot_close.ffill().bfill()
+    # Carry known prices over closed-market days; never invent pre-listing prices.
+    pivot_close = pivot_close.ffill()
     pivot_volume = pivot_volume.fillna(0)
-    pivot_open = pivot_open.ffill().bfill()
+    pivot_open = pivot_open.ffill()
     
     # Remove any remaining NaN rows
     valid_idx = ~(pivot_close.isna().any(axis=1) | pivot_open.isna().any(axis=1))
     pivot_close = pivot_close[valid_idx]
-    pivot_volume = pivot_volume.loc[pivot_close.index]
+    pivot_volume = pivot_volume.reindex(index=pivot_close.index, columns=pivot_close.columns).fillna(0)
     pivot_open = pivot_open.loc[pivot_close.index]
     
-    # Ensure all have at least 100 trading days
+    if pivot_close.shape[1] == 0:
+        raise ValueError("No valid price columns available")
+    # Ensure all have at least 100 observations
     if len(pivot_close) < 100:
         raise ValueError(f"Insufficient data: only {len(pivot_close)} trading days available (need at least 100)")
     
