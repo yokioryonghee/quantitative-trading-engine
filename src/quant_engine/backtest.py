@@ -36,6 +36,10 @@ def run_backtest(
         Dictionary with backtest results and metrics.
     """
     
+    # Ensure no NaN values in prices
+    prices = prices.fillna(method='ffill').fillna(method='bfill')
+    volume = volume.fillna(0)
+    
     # Calculate returns
     returns = prices.pct_change().fillna(0.0)
     
