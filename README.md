@@ -26,33 +26,78 @@ Most trading systems oversimplify. They generate signals without considering pos
 
 ## Quick start
 
+Requirements: Git, Python 3.10 or newer, and internet access to Yahoo Finance. Run the commands in a terminal. Copy only the commands inside each code block; all run commands below use the virtual environment's Python directly.
+
+### macOS / Linux
+
+For a new checkout, run these commands in order:
+
 ```bash
-pip install -r requirements.txt
-
-# Run base strategy
-PYTHONPATH=src python examples/run_backtest.py
-
-# Run comprehensive analysis (benchmark + parameter sweep)
-PYTHONPATH=src python examples/comprehensive_analysis.py
-
-# Generate visualization charts
-PYTHONPATH=src python examples/visualize_comprehensive.py
+git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
+cd quantitative-trading-engine
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python examples/run_backtest.py
 ```
+
+If you already cloned the project, open a terminal in that project's folder, run `git pull origin main`, then run the commands above starting with `python3 -m venv .venv`. The project folder contains `README.md`, `pyproject.toml`, and `examples/`.
+
+After the base backtest completes, run comprehensive analysis:
+
+```bash
+.venv/bin/python examples/comprehensive_analysis.py
+```
+
+Generate the performance chart:
+
+```bash
+.venv/bin/python examples/visualize_comprehensive.py
+```
+
+### Windows PowerShell
+
+For a new checkout:
+
+```powershell
+git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
+cd quantitative-trading-engine
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe examples/run_backtest.py
+```
+
+For an existing checkout, open PowerShell in the project's folder, run `git pull origin main`, then start with `py -3 -m venv .venv`.
+
+```powershell
+.\.venv\Scripts\python.exe examples/comprehensive_analysis.py
+.\.venv\Scripts\python.exe examples/visualize_comprehensive.py
+```
+
+The base run prints data-loading progress and a performance summary. Comprehensive analysis adds benchmark comparisons and parameter rankings when data is available. The chart script saves `backtest_comprehensive_analysis.png` in the project folder and opens a plot window. For a headless macOS/Linux environment, use `MPLBACKEND=Agg .venv/bin/python examples/visualize_comprehensive.py`.
+
+### Troubleshooting
+
+- **`externally-managed-environment` / PEP 668:** use the `.venv` Python commands above. Installing into the virtual environment avoids changing Homebrew or OS-managed Python; `--break-system-packages` is unnecessary.
+- **`can't open file ... examples/...`:** run from the project folder, not your home folder. Check that `examples/run_backtest.py` exists there.
+- **zsh errors such as `command not found: #`:** copy only code-block commands. The command blocks above contain no shell comments.
+- **`No data fetched`:** read the ticker-specific download errors and check Yahoo Finance access. Live downloads can be affected by connection failures or rate limits.
 
 ## Runtime and validation
 
-Requires Python 3.10 or newer. From the repository root:
+To verify the engine without downloading live market data, run the regression suite from the project folder.
+
+macOS / Linux:
 
 ```bash
-python -m venv .venv
-# macOS / Linux
-source .venv/bin/activate
-# Windows PowerShell: .venv\Scripts\Activate.ps1
-python -m pip install -e ".[test]"
-python examples/run_backtest.py
-python examples/comprehensive_analysis.py
-python examples/visualize_comprehensive.py
-python -m pytest -q
+.venv/bin/python -m pip install -e ".[test]"
+.venv/bin/python -m pytest -q
+```
+
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
 GitHub Actions runs the offline regression suite on Python 3.10/pandas 2 and Python 3.12/pandas 3, including all four example scripts and chart generation. Live runs require Yahoo Finance access; failed downloads are reported per ticker, and an entirely empty download raises an error containing the available failure reasons.
@@ -216,17 +261,78 @@ MIT
 
 ## 실행
 
+Git, Python 3.10 이상, Yahoo Finance에 접근 가능한 인터넷 연결이 필요합니다. 터미널에 **코드 블록 안의 명령만** 순서대로 붙여넣으세요. 가상환경의 Python을 직접 사용하므로 별도의 활성화 명령은 필요하지 않습니다.
+
+### macOS / Linux
+
+프로젝트를 처음 내려받는 경우:
+
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
+cd quantitative-trading-engine
+python3 -m venv .venv
+.venv/bin/python -m pip install -e .
+.venv/bin/python examples/run_backtest.py
+```
 
-# 기본 전략
-PYTHONPATH=src python examples/run_backtest.py
+이미 내려받았다면 해당 프로젝트 폴더에서 터미널을 열고 `git pull origin main`을 실행한 뒤, 위 명령 중 `python3 -m venv .venv`부터 진행하세요. 프로젝트 폴더에는 `README.md`, `pyproject.toml`, `examples/`가 있습니다.
 
-# 포괄적 분석 (벤치마크 + 파라미터 스윕)
-PYTHONPATH=src python examples/comprehensive_analysis.py
+기본 백테스트가 완료되면 포괄적 분석을 실행합니다.
 
-# 차트 생성
-PYTHONPATH=src python examples/visualize_comprehensive.py
+```bash
+.venv/bin/python examples/comprehensive_analysis.py
+```
+
+차트를 생성합니다.
+
+```bash
+.venv/bin/python examples/visualize_comprehensive.py
+```
+
+### Windows PowerShell
+
+프로젝트를 처음 내려받는 경우:
+
+```powershell
+git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
+cd quantitative-trading-engine
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe examples/run_backtest.py
+```
+
+이미 내려받았다면 해당 프로젝트 폴더에서 `git pull origin main`을 실행한 뒤 `py -3 -m venv .venv`부터 진행하세요.
+
+```powershell
+.\.venv\Scripts\python.exe examples/comprehensive_analysis.py
+.\.venv\Scripts\python.exe examples/visualize_comprehensive.py
+```
+
+기본 실행은 데이터 다운로드 진행 상황과 성과 요약을 출력합니다. 포괄적 분석은 데이터를 확보한 경우 벤치마크 비교와 파라미터 순위를 추가로 출력합니다. 차트는 프로젝트 폴더에 `backtest_comprehensive_analysis.png`로 저장되고 그래프 창이 열립니다. GUI가 없는 macOS/Linux 환경에서는 `MPLBACKEND=Agg .venv/bin/python examples/visualize_comprehensive.py`를 사용하세요.
+
+### 실행 오류 해결
+
+- **PEP 668 / `externally-managed-environment`:** 위의 `.venv` Python으로 설치하세요. Homebrew나 운영체제의 Python에 직접 설치할 필요가 없으며 `--break-system-packages`도 필요하지 않습니다.
+- **`can't open file ... examples/...`:** 홈 폴더가 아닌 프로젝트 폴더에서 실행하세요. 해당 폴더에 `examples/run_backtest.py`가 있는지 확인하세요.
+- **zsh의 `command not found: #` 등:** 설명 문장 대신 코드 블록 안의 명령만 복사하세요. 위 명령 블록에는 셸 주석을 넣지 않았습니다.
+- **`No data fetched`:** 종목별 다운로드 오류를 확인하세요. 인터넷 연결, Yahoo Finance 접근 제한이나 요청 횟수 제한으로 실제 시세 다운로드가 실패할 수 있습니다.
+
+### 실제 시세 다운로드 없이 검증
+
+프로젝트 폴더에서 테스트를 실행할 수 있습니다. 테스트에는 예제 실행과 차트 생성 검증이 포함됩니다.
+
+macOS / Linux:
+
+```bash
+.venv/bin/python -m pip install -e ".[test]"
+.venv/bin/python -m pytest -q
+```
+
+Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e ".[test]"
+.\.venv\Scripts\python.exe -m pytest -q
 ```
 
 ## 아키텍처
