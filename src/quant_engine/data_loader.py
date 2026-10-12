@@ -33,7 +33,7 @@ def fetch_market_data(
         end_date: End date (YYYY-MM-DD). Defaults to today.
     
     Returns:
-        DataFrame with multi-index (Date, Symbol) with OHLCV data.
+        DataFrame with columns: Date, Open, High, Low, Close, Volume, Symbol
     """
     if end_date is None:
         end_date = datetime.now().strftime("%Y-%m-%d")
@@ -57,27 +57,29 @@ def fetch_market_data(
     if not data_dict:
         raise ValueError("No data fetched. Check symbols and internet connection.")
     
-    # Align all data to common dates
+    # Normalize and align all data
     aligned_list = []
     for sym, df in data_dict.items():
         df_copy = df.reset_index()
-        df_copy["Symbol"] = sym
-        aligned_list.append(df_copy)
+        
+        # Standardize column names
+        df_copy.columns = [col.lower() for col in df_copy.columns]
+        
+        # Extract only required columns, handle missing ones
+        df_normalized = pd.DataFrame()
+        df_normalized['Date'] = pd.to_datetime(df_copy['date'])
+        df_normalized['Open'] = df_copy.get('open', np.nan)
+        df_normalized['High'] = df_copy.get('high', np.nan)
+        df_normalized['Low'] = df_copy.get('low', np.nan)
+        df_normalized['Close'] = df_copy.get('close', np.nan)
+        df_normalized['Volume'] = df_copy.get('volume', 0.0)
+        df_normalized['Symbol'] = sym
+        
+        aligned_list.append(df_normalized)
     
+    # Concatenate all normalized data
     aligned_data = pd.concat(aligned_list, ignore_index=True)
-    
-    # Handle columns flexibly (some may not have Adj Close)
-    if "Adj Close" in aligned_data.columns:
-        columns_to_keep = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume", "Symbol"]
-    else:
-        columns_to_keep = ["Date", "Open", "High", "Low", "Close", "Volume", "Symbol"]
-    
-    # Only keep columns that exist in the dataframe
-    columns_to_keep = [col for col in columns_to_keep if col in aligned_data.columns]
-    aligned_data = aligned_data[columns_to_keep]
-    
-    aligned_data["Date"] = pd.to_datetime(aligned_data["Date"])
-    aligned_data = aligned_data.sort_values(["Date", "Symbol"]).reset_index(drop=True)
+    aligned_data = aligned_data.sort_values(['Date', 'Symbol']).reset_index(drop=True)
     
     return aligned_data
 
@@ -100,8 +102,14 @@ def prepare_panel_data(df: pd.DataFrame) -> tuple:
     pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume")
     pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open")
     
-    # Forward fill for gaps, then backward fill (use newer pandas syntax)
-    pivot_close = pivot_close.bfill().ffill()  # bfill first for leading NaNs, then ffill
+    # Forward fill for gaps, then backward fill (handle leading/trailing NaNs)
+    pivot_close = pivot_close.ffill().bfill()
     pivot_volume = pivot_volume.fillna(0)
+    pivot_open = pivot_open.ffill().bfill()
+    
+    # Remove any rows with NaN values
+    pivot_close = pivot_close.dropna()
+    pivot_volume = pivot_volume.loc[pivot_close.index]
+    pivot_open = pivot_open.loc[pivot_close.index]
     
     return pivot_close, pivot_volume, pivot_open
