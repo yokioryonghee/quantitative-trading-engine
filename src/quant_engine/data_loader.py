@@ -58,12 +58,20 @@ def fetch_market_data(
         raise ValueError("No data fetched. Check symbols and internet connection.")
     
     # Align all data to common dates
-    aligned_data = pd.concat(
-        [df.assign(Symbol=sym) for sym, df in data_dict.items()]
-    ).reset_index()
-    aligned_data.columns = [
-        "Date", "Open", "High", "Low", "Close", "Adj Close", "Volume", "Symbol"
-    ]
+    aligned_list = []
+    for sym, df in data_dict.items():
+        df_copy = df.reset_index()
+        df_copy["Symbol"] = sym
+        aligned_list.append(df_copy)
+    
+    aligned_data = pd.concat(aligned_list, ignore_index=True)
+    
+    # Handle columns flexibly (some may not have Adj Close)
+    if "Adj Close" in aligned_data.columns:
+        aligned_data = aligned_data[["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume", "Symbol"]]
+    else:
+        aligned_data = aligned_data[["Date", "Open", "High", "Low", "Close", "Volume", "Symbol"]]
+    
     aligned_data["Date"] = pd.to_datetime(aligned_data["Date"])
     aligned_data = aligned_data.sort_values(["Date", "Symbol"]).reset_index(drop=True)
     
@@ -80,7 +88,7 @@ def get_optimal_universe() -> list[str]:
     return symbols
 
 
-def prepare_panel_data(df: pd.DataFrame) -> pd.DataFrame:
+def prepare_panel_data(df: pd.DataFrame) -> tuple:
     """
     Convert aligned data into panel format (Date x Symbol).
     """
@@ -88,7 +96,7 @@ def prepare_panel_data(df: pd.DataFrame) -> pd.DataFrame:
     pivot_volume = df.pivot_table(index="Date", columns="Symbol", values="Volume")
     pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open")
     
-    # Forward fill for gaps, then backward fill
+    # Forward fill for gaps, then backward fill (use newer pandas syntax)
     pivot_close = pivot_close.fillna(method="ffill").fillna(method="bfill")
     pivot_volume = pivot_volume.fillna(0)
     
