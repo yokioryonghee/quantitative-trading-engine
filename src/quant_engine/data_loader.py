@@ -68,9 +68,13 @@ def fetch_market_data(
     
     # Handle columns flexibly (some may not have Adj Close)
     if "Adj Close" in aligned_data.columns:
-        aligned_data = aligned_data[["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume", "Symbol"]]
+        columns_to_keep = ["Date", "Open", "High", "Low", "Close", "Adj Close", "Volume", "Symbol"]
     else:
-        aligned_data = aligned_data[["Date", "Open", "High", "Low", "Close", "Volume", "Symbol"]]
+        columns_to_keep = ["Date", "Open", "High", "Low", "Close", "Volume", "Symbol"]
+    
+    # Only keep columns that exist in the dataframe
+    columns_to_keep = [col for col in columns_to_keep if col in aligned_data.columns]
+    aligned_data = aligned_data[columns_to_keep]
     
     aligned_data["Date"] = pd.to_datetime(aligned_data["Date"])
     aligned_data = aligned_data.sort_values(["Date", "Symbol"]).reset_index(drop=True)
@@ -97,7 +101,7 @@ def prepare_panel_data(df: pd.DataFrame) -> tuple:
     pivot_open = df.pivot_table(index="Date", columns="Symbol", values="Open")
     
     # Forward fill for gaps, then backward fill (use newer pandas syntax)
-    pivot_close = pivot_close.fillna(method="ffill").fillna(method="bfill")
+    pivot_close = pivot_close.bfill().ffill()  # bfill first for leading NaNs, then ffill
     pivot_volume = pivot_volume.fillna(0)
     
     return pivot_close, pivot_volume, pivot_open
