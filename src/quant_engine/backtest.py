@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from quant_engine.indicators import generate_multifactor_signal
 from quant_engine.risk import (
@@ -20,6 +19,8 @@ def run_backtest(
     volume: pd.DataFrame,
     initial_capital: float = 100000.0,
     target_leverage: float = 1.5,
+    momentum_window: int = 20,
+    mean_reversion_window: int = 30,
     rebalance_freq: int = 20,  # Rebalance every 20 days
 ) -> dict:
     """
@@ -36,15 +37,21 @@ def run_backtest(
         Dictionary with backtest results and metrics.
     """
     
+    if prices.empty or prices.shape[1] == 0:
+        raise ValueError("Prices must not be empty")
+    if initial_capital <= 0 or rebalance_freq < 1:
+        raise ValueError("Capital and rebalance frequency must be positive")
     # Ensure no NaN values in prices
-    prices = prices.fillna(method='ffill').fillna(method='bfill')
+    prices = prices.ffill()
+    if prices.isna().any().any() or not np.isfinite(prices.to_numpy()).all() or (prices <= 0).any().any():
+        raise ValueError("Prices must be finite and positive, with no leading missing values")
     volume = volume.fillna(0)
     
     # Calculate returns
     returns = prices.pct_change().fillna(0.0)
     
     # Generate signals
-    signals = generate_multifactor_signal(prices)
+    signals = generate_multifactor_signal(prices, momentum_window=momentum_window, mean_reversion_window=mean_reversion_window)
     
     # Allocate positions
     positions = allocate_positions_optimal(
@@ -92,7 +99,7 @@ def run_backtest(
         "win_rate": float(win_rate),
         "profit_factor": float(profit_factor),
         "final_value": float(cumulative.iloc[-1]),
-        "num_trades": int(((positions != 0).sum().sum() - (positions.shift(1) != 0).sum().sum()) / 2),
+        "num_trades": int(positions.sub(positions.shift(1).fillna(0)).abs().gt(1e-12).sum().sum()),
     }
     
     return result

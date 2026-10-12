@@ -39,6 +39,28 @@ PYTHONPATH=src python examples/comprehensive_analysis.py
 PYTHONPATH=src python examples/visualize_comprehensive.py
 ```
 
+## Runtime and validation
+
+Requires Python 3.10 or newer. From the repository root:
+
+```bash
+python -m venv .venv
+# macOS / Linux
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e ".[test]"
+python examples/run_backtest.py
+python examples/comprehensive_analysis.py
+python examples/visualize_comprehensive.py
+python -m pytest -q
+```
+
+GitHub Actions runs the offline regression suite on Python 3.10/pandas 2 and Python 3.12/pandas 3, including all four example scripts and chart generation. Live runs require Yahoo Finance access; failed downloads are reported per ticker, and an entirely empty download raises an error containing the available failure reasons.
+
+Kelly sizing uses expanding history with a 20-observation warmup. Target allocations stay within 10% per asset and the gross leverage ceiling; low conviction can leave capital uninvested. Missing prices are carried forward only, and the panel starts after every included asset has an observed price. Benchmark comparison compounds strategy returns between shared market dates. Parameter sweeps use the same 20-observation rebalance schedule as the main backtest.
+
+This is a research backtester: positions are target weights held between signal updates, not a broker execution simulator. Transaction costs, borrow fees, FX conversion and cash interest are not modeled. Metrics use a 252-period annualization convention, so mixed crypto/equity daily calendars require care when interpreting annualized values. Parameter rankings are in-sample, not an out-of-sample performance guarantee. `config.yaml` is a legacy example and is not consumed by the current engine; pass runtime options to `build_engine` instead.
+
 ## Architecture
 
 ```

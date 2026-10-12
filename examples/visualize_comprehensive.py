@@ -6,7 +6,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
     # Plot 5: Monthly returns heatmap
     ax = fig.add_subplot(gs[2, :])
-    monthly_returns = results["returns"].fillna(0.0).resample("M").apply(lambda x: (1 + x).prod() - 1) * 100
+    monthly_returns = results["returns"].fillna(0.0).resample("ME").apply(lambda x: (1 + x).prod() - 1) * 100
     years = monthly_returns.index.year.unique()
     months = np.arange(1, 13)
     heatmap_data = np.full((len(years), 12), np.nan)

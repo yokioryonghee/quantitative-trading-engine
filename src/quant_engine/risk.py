@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 
 def compute_drawdown(cumulative_returns: pd.Series) -> float:
@@ -71,7 +70,7 @@ def compute_kelly_fraction(win_rate: float, avg_win: float, avg_loss: float) -> 
     Returns fraction of capital to allocate (0-1).
     """
     if avg_loss == 0 or win_rate <= 0 or win_rate >= 1:
-        return 0.25  # Default to 25% if undefined
+        return 0.0 if win_rate <= 0 else 0.25
     
     b = avg_win / avg_loss if avg_loss != 0 else 1.0
     p = win_rate
@@ -129,25 +128,29 @@ def allocate_positions_optimal(
     Returns:
         DataFrame with position sizes (as % of capital) for each asset.
     """
+    if target_leverage < 0 or not 0 < max_position_size <= 1:
+        raise ValueError("Invalid leverage or position limit")
+    if not signals.index.equals(returns.index) or not signals.columns.equals(returns.columns):
+        raise ValueError("Signals and returns must have matching dates and symbols")
     positions = pd.DataFrame(0.0, index=signals.index, columns=signals.columns)
-    
     for symbol in signals.columns:
-        signal = signals[symbol]
         ret = returns[symbol]
-        
-        # Compute Kelly fraction for this asset
-        win_rate, avg_win, avg_loss = compute_win_rate(ret)
-        kelly = compute_kelly_fraction(win_rate, avg_win, avg_loss)
-        
-        # Position size = signal strength × Kelly fraction × leverage
-        # Clipped to max position size
-        base_allocation = signal * kelly * target_leverage
-        position = np.clip(base_allocation, -max_position_size, max_position_size)
-        positions[symbol] = position
-    
-    # Normalize to target leverage
-    total_abs = positions.abs().sum(axis=1)
-    total_abs = total_abs.replace(0, 1e-10)
-    positions = positions.div(total_abs, axis=0) * target_leverage
-    
-    return positions
+        # Expanding statistics contain only observations available at this close.
+        # The backtest executes these target weights on the following interval.
+        count = ret.notna().cumsum()
+        wins = (ret > 0).cumsum()
+        losses = (ret < 0).cumsum()
+        avg_win = ret.where(ret > 0, 0.0).cumsum() / wins.replace(0, np.nan)
+        avg_loss = -ret.where(ret < 0, 0.0).cumsum() / losses.replace(0, np.nan)
+        win_rate = wins / count.replace(0, np.nan)
+        payoff = avg_win / avg_loss
+        kelly = ((payoff * win_rate - (1 - win_rate)) / payoff / 2).clip(0, .25)
+        kelly = kelly.where(losses > 0, .25).where(wins > 0, 0.0)
+        kelly = kelly.where(count >= 20, 0.0).fillna(0.0)
+        positions[symbol] = (signals[symbol] * kelly * target_leverage).clip(
+            -max_position_size, max_position_size
+        )
+    # A leverage ceiling scales down only; weak signals may leave cash uninvested.
+    exposure = positions.abs().sum(axis=1)
+    scale = (target_leverage / exposure.replace(0, np.nan)).clip(upper=1).fillna(1)
+    return positions.mul(scale, axis=0)
