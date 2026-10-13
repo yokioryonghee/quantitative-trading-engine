@@ -106,6 +106,9 @@ def test_examples_run_offline(monkeypatch, tmp_path, prices, script):
     import matplotlib.pyplot as plt
     def download(symbol, **kwargs):
         close = prices['SPY']
+        if symbol == 'KRW=X':
+            dates=pd.bdate_range(close.index.min()-pd.Timedelta(days=10),close.index.max())
+            close=pd.Series(1000.,index=dates)
         return pd.DataFrame({'Open': close, 'Close': close, 'High': close, 'Low': close, 'Volume': 100}, index=close.index)
     monkeypatch.setattr(data_loader.yf, 'download', download)
     monkeypatch.setattr(plt, 'show', lambda: None)
