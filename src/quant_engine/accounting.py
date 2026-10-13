@@ -5,7 +5,8 @@ import pandas as pd
 def simulate(prices,targets,volume,capital,open_prices=None,cost_bps=10.,borrow_rate=.03,cash_rate=0.,rebalance_freq=20):
     if not np.isfinite([capital,cost_bps,borrow_rate,cash_rate]).all() or capital<=0 or not 0<=cost_bps<10000 or min(borrow_rate,cash_rate)<0:
         raise ValueError('Invalid accounting settings')
-    next_open=open_prices is not None
+    if not targets.index.equals(prices.index) or not targets.columns.equals(prices.columns) or not np.isfinite(targets.to_numpy()).all():
+        raise ValueError("Finite aligned targets required")
     execution=prices if open_prices is None else open_prices.reindex_like(prices)
     if execution.isna().any().any() or not np.isfinite(execution.to_numpy()).all() or (execution<=0).any().any():
         raise ValueError('Execution prices must be finite positive and aligned')

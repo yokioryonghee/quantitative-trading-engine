@@ -42,9 +42,11 @@ def run_backtest(
         Dictionary with backtest results and metrics.
     """
     
+    if not prices.index.is_unique or not prices.index.is_monotonic_increasing or prices.index.hasnans:
+        raise ValueError("Price dates must be unique, valid and increasing")
     if prices.empty or prices.shape[1] == 0:
         raise ValueError("Prices must not be empty")
-    if initial_capital <= 0 or rebalance_freq < 1:
+    if not isinstance(rebalance_freq,int) or initial_capital <= 0 or rebalance_freq < 1:
         raise ValueError("Capital and rebalance frequency must be positive")
     # Ensure no NaN values in prices
     prices = prices.ffill()
