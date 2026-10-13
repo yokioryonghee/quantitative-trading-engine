@@ -121,7 +121,7 @@ def fetch_market_data(
 
 def get_optimal_universe() -> list[str]:
     """
-    Return best-performing assets across all classes for this backtest.
+    Return the fixed example universe; this is not an optimized or survivorship-free universe.
     """
     symbols = []
     for asset_class, tickers in ASSET_UNIVERSE.items():
@@ -162,3 +162,22 @@ def prepare_panel_data(df: pd.DataFrame) -> tuple:
         raise ValueError(f"Insufficient data: only {len(pivot_close)} trading days available (need at least 100)")
     
     return pivot_close, pivot_volume, pivot_open
+
+
+
+def convert_to_usd(raw):
+    """Convert Korean OHLC quotes to USD using observed USD/KRW daily FX."""
+    korean=raw.Symbol.astype(str).str.endswith(('.KS','.KQ'))
+    if not korean.any(): return raw
+    start=(raw.loc[korean,'Date'].min()-pd.Timedelta(days=10)).strftime('%Y-%m-%d')
+    end=(raw.loc[korean,'Date'].max()+pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+    downloaded=yf.download('KRW=X',start=start,end=end,progress=False,auto_adjust=True,multi_level_index=False,timeout=20)
+    if downloaded is None or downloaded.empty: raise ValueError('USD/KRW FX required for Korean assets')
+    fx=normalize_download(downloaded,'KRW=X')['close'].sort_index()
+    dates=pd.DatetimeIndex(raw.loc[korean,'Date'])
+    rates=fx.reindex(fx.index.union(dates)).ffill().reindex(dates).to_numpy()
+    if not np.isfinite(rates).all() or (rates<=0).any(): raise ValueError('Missing/invalid observed FX rates')
+    result=raw.copy()
+    for field in ['Open','High','Low','Close']:
+        result.loc[korean,field]=result.loc[korean,field].to_numpy()/rates
+    return result

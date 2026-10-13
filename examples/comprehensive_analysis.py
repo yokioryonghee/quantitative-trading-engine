@@ -20,6 +20,7 @@ from quant_engine.data_loader import (
     fetch_market_data,
     get_optimal_universe,
     prepare_panel_data,
+    convert_to_usd,
 )
 from quant_engine.engine import build_engine
 
@@ -48,8 +49,8 @@ if __name__ == "__main__":
     try:
         symbols = get_optimal_universe()
         raw_data = fetch_market_data(symbols)
-        prices, volume, _ = prepare_panel_data(raw_data)
-        param_results = parameter_sweep(prices, volume)
+        prices, volume, openings = prepare_panel_data(convert_to_usd(raw_data))
+        param_results = parameter_sweep(prices, volume, open_prices=openings)
         print(f"✓ Parameter sweep complete - Top 5 configurations identified")
     except Exception as e:
         print(f"⚠ Parameter sweep skipped: {str(e)[:50]}")
@@ -84,3 +85,4 @@ if __name__ == "__main__":
                 f"Sharpe: {config['sharpe_ratio']:6.4f}"
             )
         print("\n" + "="*70 + "\n")
+

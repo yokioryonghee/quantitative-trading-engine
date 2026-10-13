@@ -134,7 +134,8 @@ def allocate_positions_optimal(
         raise ValueError("Signals and returns must have matching dates and symbols")
     positions = pd.DataFrame(0.0, index=signals.index, columns=signals.columns)
     for symbol in signals.columns:
-        ret = returns[symbol]
+        # Heuristic signal-conditioned historical payoffs, not optimal Kelly proof.
+        ret = returns[symbol] * signals[symbol].shift(1).fillna(0)
         # Expanding statistics contain only observations available at this close.
         # The backtest executes these target weights on the following interval.
         count = ret.notna().cumsum()
@@ -154,3 +155,4 @@ def allocate_positions_optimal(
     exposure = positions.abs().sum(axis=1)
     scale = (target_leverage / exposure.replace(0, np.nan)).clip(upper=1).fillna(1)
     return positions.mul(scale, axis=0)
+

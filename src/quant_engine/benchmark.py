@@ -60,6 +60,7 @@ def parameter_sweep(
     volume: pd.DataFrame,
     momentum_windows: list[int] | None = None,
     mean_reversion_windows: list[int] | None = None,
+    open_prices: pd.DataFrame | None = None,
 ) -> list[dict]:
     if momentum_windows is None:
         momentum_windows = [10, 20, 30]
@@ -71,7 +72,7 @@ def parameter_sweep(
         for mean_reversion_window in mean_reversion_windows:
             backtest = run_backtest(
                 prices, volume, momentum_window=momentum_window,
-                mean_reversion_window=mean_reversion_window,
+                mean_reversion_window=mean_reversion_window, open_prices=open_prices,
             )
             total_return = backtest["total_return"]
             sharpe = backtest["sharpe_ratio"]
@@ -86,3 +87,4 @@ def parameter_sweep(
 
     results.sort(key=lambda x: x["sharpe_ratio"], reverse=True)
     return results[:5]
+
