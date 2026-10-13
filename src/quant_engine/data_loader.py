@@ -173,7 +173,7 @@ def convert_to_usd(raw):
     end=(raw.loc[korean,'Date'].max()+pd.Timedelta(days=1)).strftime('%Y-%m-%d')
     downloaded=yf.download('KRW=X',start=start,end=end,progress=False,auto_adjust=True,multi_level_index=False,timeout=20)
     if downloaded is None or downloaded.empty: raise ValueError('USD/KRW FX required for Korean assets')
-    fx=normalize_download(downloaded,'KRW=X')['close'].sort_index()
+    fx=normalize_download(downloaded,'KRW=X')['close'].sort_index().shift(1)
     dates=pd.DatetimeIndex(raw.loc[korean,'Date'])
     rates=fx.reindex(fx.index.union(dates)).ffill().reindex(dates).to_numpy()
     if not np.isfinite(rates).all() or (rates<=0).any(): raise ValueError('Missing/invalid observed FX rates')

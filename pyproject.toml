@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "quantitative-trading-engine"
 version = "1.0.0"
-description = "Production-grade quantitative trading engine with multi-asset support, optimal Kelly sizing, and real-world backtesting."
+description = "Daily-bar research backtester with explicit share/cash accounting and rule-based signals."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -23,3 +23,4 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+

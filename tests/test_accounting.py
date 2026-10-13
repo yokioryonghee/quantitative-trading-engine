@@ -32,7 +32,7 @@ def test_nontrading_day_defers_order():
 def test_fx_conversion(monkeypatch):
     dates=pd.bdate_range('2024-01-01',periods=3)
     import quant_engine.data_loader as loader
-    fx=pd.DataFrame({'Open':1000.,'High':1000.,'Low':1000.,'Close':1000.,'Volume':1},index=dates)
+    fx=pd.DataFrame({'Open':1000.,'High':1000.,'Low':1000.,'Close':1000.,'Volume':1},index=dates-pd.Timedelta(days=1))
     monkeypatch.setattr(loader.yf,'download',lambda *a,**k:fx)
     raw=pd.DataFrame({'Date':dates,'Symbol':'005930.KS','Open':10000.,'High':10000.,'Low':10000.,'Close':10000.,'Volume':1})
     assert convert_to_usd(raw).Close.eq(10).all()
