@@ -1,10 +1,10 @@
 # quantitative-trading-engine
 
-Production-grade algorithmic trading system with multi-asset support, optimal position sizing, benchmark comparison, and parameter optimization. Built to demonstrate systems thinking, statistical rigor, and real-world trading constraints.
+A Python backtester for stocks, crypto, commodities, and indices. Downloads historical prices with yfinance, calculates trading signals and position weights, and compares strategy returns with a benchmark.
 
 ## Overview
 
-This engine combines advanced signal generation, risk-aware position sizing, and rigorous backtesting to create a realistic trading system across multiple asset classes:
+The examples cover the following assets:
 
 - **US Stocks**: AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META
 - **Korean Stocks**: Samsung, LG, SK Hynix, Kakao  
@@ -12,15 +12,13 @@ This engine combines advanced signal generation, risk-aware position sizing, and
 - **Commodities**: Gold, Oil, Commodities Index
 - **Indices**: SPY, QQQ
 
-## Why this matters
-
-Most trading systems oversimplify. They generate signals without considering position sizing, realistic constraints, or actual market conditions. This engine is built for production:
+## Features
 
 - **Multi-factor signals**: Momentum + mean reversion + RSI + price action
-- **Optimal Kelly sizing**: Position sizes derived from historical win rates and risk metrics
+- **Kelly sizing**: Position weights estimated from historical win rates and average gains and losses
 - **Real market data**: 10 years of yfinance data across all asset classes
 - **Benchmark comparison**: Strategy performance vs S&P 500 (Alpha, Beta)
-- **Parameter optimization**: Systematic testing of signal parameters to find robust configurations
+- **Parameter sweeps**: Compare backtest results across signal parameter settings
 - **Risk controls**: Leverage limits, drawdown tracking, Sharpe/Sortino/Calmar ratios
 - **Rebalancing logic**: Periodic portfolio rebalancing every 20 days
 
@@ -211,17 +209,6 @@ Positions are capped at 10% per symbol and 150% total leverage to manage risk.
 
 The system sweeps momentum window (10-30 days) and mean reversion window (20-50 days) to identify configurations that maximize Sharpe ratio while maintaining reasonable returns. Top 5 configurations are ranked and reported.
 
-## What this demonstrates
-
-- **Systems thinking**: End-to-end pipeline from raw data to validated results
-- **Statistical rigor**: Multiple performance metrics, not just returns
-- **Engineering discipline**: Modular, testable, maintainable code
-- **Risk consciousness**: Emphasis on drawdown control and downside protection
-- **Validation mindset**: Benchmark comparison and parameter optimization built-in
-- **Multi-asset expertise**: Handles stocks, crypto, commodities in unified framework
-- **Real-world constraints**: Leverage limits, rebalancing friction, transaction costs awareness
-- **Quantitative reasoning**: Kelly Criterion, factor weighting, statistical metrics
-
 ## Stack
 
 Python • pandas • numpy • scipy • matplotlib • yfinance • scikit-learn
@@ -236,26 +223,24 @@ MIT
 
 # quantitative-trading-engine
 
-멀티에셋 지원, 최적 포지션 사이징, 벤치마크 비교, 파라미터 최적화를 갖춘 실전형 알고리즘 트레이딩 엔진. 시스템 사고, 통계적 엄격함, 실제 거래 제약 조건을 다루는 역량을 보여준다.
+주식, 암호화폐, 원자재, 지수를 대상으로 하는 Python 백테스터입니다. yfinance로 과거 가격을 받아 매매 신호와 투자 비중을 계산하고, 전략 수익률을 벤치마크와 비교합니다.
 
 ## 개요
 
-고급 신호 생성, 리스크 기반 포지션 사이징, 엄격한 백테스팅을 결합해 여러 자산군에서 작동하는 실전형 거래 시스템을 구축했다.
-
-지원 자산군:
+예제에서 사용하는 자산은 다음과 같습니다.
 - 미국주: AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META
 - 한국주: 삼성전자, LG전자, SK하이닉스, 카카오
 - 암호화폐: BTC, ETH
 - 실물자산: 금, 석유, 상품지수
 - 지수: SPY, QQQ
 
-## 핵심 특징
+## 주요 기능
 
 - **멀티팩터 신호**: 모멘텀 + 평균 회귀 + RSI + 가격 추세
-- **켈리 포지션 사이징**: 과거 승률과 리스크 기반 최적 포지션 크기
+- **켈리 포지션 사이징**: 과거 승률과 평균 이익·손실을 바탕으로 투자 비중 계산
 - **실제 시장 데이터**: 10년 yfinance 데이터 (모든 자산군)
 - **벤치마크 비교**: S&P 500 대비 성과 (Alpha, Beta)
-- **파라미터 최적화**: 신호 파라미터의 체계적 테스트
+- **파라미터 비교**: 신호 설정을 바꿔가며 백테스트 결과 비교
 - **리스크 관리**: 레버리지 한도, 낙폭 추적, 샤프/소르티노/칼마 지수
 - **정기 리밸런싱**: 20일마다 자동 포트폴리오 조정
 
@@ -277,7 +262,7 @@ python3 -m venv .venv
 
 이미 내려받았다면 해당 프로젝트 폴더에서 터미널을 열고 `git pull origin main`을 실행한 뒤, 위 명령 중 `python3 -m venv .venv`부터 진행하세요. 프로젝트 폴더에는 `README.md`, `pyproject.toml`, `examples/`가 있습니다.
 
-기본 백테스트가 완료되면 포괄적 분석을 실행합니다.
+기본 백테스트가 완료되면 벤치마크·파라미터 분석을 실행합니다.
 
 ```bash
 .venv/bin/python examples/comprehensive_analysis.py
@@ -308,7 +293,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe examples/visualize_comprehensive.py
 ```
 
-기본 실행은 데이터 다운로드 진행 상황과 성과 요약을 출력합니다. 포괄적 분석은 데이터를 확보한 경우 벤치마크 비교와 파라미터 순위를 추가로 출력합니다. 차트는 프로젝트 폴더에 `backtest_comprehensive_analysis.png`로 저장되고 그래프 창이 열립니다. GUI가 없는 macOS/Linux 환경에서는 `MPLBACKEND=Agg .venv/bin/python examples/visualize_comprehensive.py`를 사용하세요.
+기본 실행은 데이터 다운로드 진행 상황과 성과 요약을 출력합니다. 벤치마크·파라미터 분석은 데이터를 확보한 경우 벤치마크 비교와 파라미터 순위를 추가로 출력합니다. 차트는 프로젝트 폴더에 `backtest_comprehensive_analysis.png`로 저장되고 그래프 창이 열립니다. GUI가 없는 macOS/Linux 환경에서는 `MPLBACKEND=Agg .venv/bin/python examples/visualize_comprehensive.py`를 사용하세요.
 
 ### 실행 오류 해결
 
@@ -439,17 +424,6 @@ f* = (bp - q) / b, 안전을 위해 25% 한도
 ### 파라미터 최적화
 
 모멘텀 윈도우(10-30일)와 평균 회귀 윈도우(20-50일)를 스윕해 샤프 지수를 최대화하면서 합리적 수익을 유지하는 설정을 식별한다.
-
-## 이 프로젝트가 보여주는 것
-
-- **시스템 사고**: 원본 데이터에서 검증된 결과까지 완전한 파이프라인
-- **통계적 엄격함**: 단순 수익률이 아닌 다양한 성과 지표
-- **엔지니어링 역량**: 모듈식, 테스트 가능, 유지보수 용이한 코드
-- **리스크 의식**: 낙폭 제어와 하방 보호에 중점
-- **검증 습관**: 벤치마크 비교와 파라미터 최적화 내장
-- **멀티에셋 역량**: 주식, 암호화폐, 실물자산을 통합 프레임워크로 처리
-- **실전 제약 이해**: 레버리지 한도, 리밸런싱 마찰, 거래 비용 인식
-- **정량적 사고**: 켈리 기준, 팩터 가중치, 통계 지표
 
 ## 기술 스택
 
