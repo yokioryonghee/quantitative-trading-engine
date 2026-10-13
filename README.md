@@ -1,34 +1,12 @@
 # quantitative-trading-engine
 
-A Python backtester for stocks, crypto, commodities, and indices. Downloads historical prices with yfinance, calculates trading signals and position weights, and compares strategy returns with a benchmark.
+A daily-bar research backtester with rule-based signals, share/cash accounting, benchmark comparison and parameter sweeps. It does not submit broker orders or claim verified market outperformance.
 
-## Overview
+## 설치와 실행
 
-The examples cover the following assets:
+Git, Python 3.10 이상과 Yahoo Finance 연결이 필요합니다.
 
-- **US Stocks**: AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META
-- **Korean Stocks**: Samsung, LG, SK Hynix, Kakao  
-- **Crypto**: Bitcoin, Ethereum
-- **Commodities**: Gold, Oil, Commodities Index
-- **Indices**: SPY, QQQ
-
-## Features
-
-- **Multi-factor signals**: Momentum + mean reversion + RSI + price action
-- **Kelly sizing**: Position weights estimated from historical win rates and average gains and losses
-- **Real market data**: 10 years of yfinance data across all asset classes
-- **Benchmark comparison**: Strategy performance vs S&P 500 (Alpha, Beta)
-- **Parameter sweeps**: Compare backtest results across signal parameter settings
-- **Risk controls**: Leverage limits, drawdown tracking, Sharpe/Sortino/Calmar ratios
-- **Rebalancing logic**: Periodic portfolio rebalancing every 20 days
-
-## Quick start
-
-Requirements: Git, Python 3.10 or newer, and internet access to Yahoo Finance. Run the commands in a terminal. Copy only the commands inside each code block; all run commands below use the virtual environment's Python directly.
-
-### macOS / Linux
-
-For a new checkout, run these commands in order:
+macOS / Linux:
 
 ```bash
 git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
@@ -36,25 +14,11 @@ cd quantitative-trading-engine
 python3 -m venv .venv
 .venv/bin/python -m pip install -e .
 .venv/bin/python examples/run_backtest.py
-```
-
-If you already cloned the project, open a terminal in that project's folder, run `git pull origin main`, then run the commands above starting with `python3 -m venv .venv`. The project folder contains `README.md`, `pyproject.toml`, and `examples/`.
-
-After the base backtest completes, run comprehensive analysis:
-
-```bash
 .venv/bin/python examples/comprehensive_analysis.py
-```
-
-Generate the performance chart:
-
-```bash
 .venv/bin/python examples/visualize_comprehensive.py
 ```
 
-### Windows PowerShell
-
-For a new checkout:
+Windows PowerShell:
 
 ```powershell
 git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
@@ -62,369 +26,49 @@ cd quantitative-trading-engine
 py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe examples/run_backtest.py
-```
-
-For an existing checkout, open PowerShell in the project's folder, run `git pull origin main`, then start with `py -3 -m venv .venv`.
-
-```powershell
 .\.venv\Scripts\python.exe examples/comprehensive_analysis.py
 .\.venv\Scripts\python.exe examples/visualize_comprehensive.py
 ```
 
-The base run prints data-loading progress and a performance summary. Comprehensive analysis adds benchmark comparisons and parameter rankings when data is available. The chart script saves `backtest_comprehensive_analysis.png` in the project folder and opens a plot window. For a headless macOS/Linux environment, use `MPLBACKEND=Agg .venv/bin/python examples/visualize_comprehensive.py`.
+이미 내려받았다면 프로젝트 폴더에서 `git pull origin main`으로 갱신하고 가상환경 Python으로 설치·실행합니다. 차트는 `backtest_comprehensive_analysis.png`에 저장됩니다. GUI가 없는 환경은 `MPLBACKEND=Agg`를 지정합니다.
 
-### Troubleshooting
+## 계산 방식
 
-- **`externally-managed-environment` / PEP 668:** use the `.venv` Python commands above. Installing into the virtual environment avoids changing Homebrew or OS-managed Python; `--break-system-packages` is unnecessary.
-- **`can't open file ... examples/...`:** run from the project folder, not your home folder. Check that `examples/run_backtest.py` exists there.
-- **zsh errors such as `command not found: #`:** copy only code-block commands. The command blocks above contain no shell comments.
-- **`No data fetched`:** read the ticker-specific download errors and check Yahoo Finance access. Live downloads can be affected by connection failures or rate limits.
+- yfinance 조정 일봉을 읽고 미래 가격을 과거로 역채움하지 않습니다. 미국 주식/ETF, 암호화폐, 상품, 한국 종목을 예제로 사용합니다.
+- 한국 OHLC 가격은 관측된 USD/KRW 자료로 USD 환산합니다. FX가 없거나 잘못되면 해당 계산을 중단합니다.
+- 모멘텀, 평균 회귀, RSI, 이동평균 대비 가격을 고정 가중치로 조합합니다. 학습하는 ML 모델이나 실시간 feed는 없습니다.
+- 투자 비중은 과거 신호와 이후 수익에서 얻은 payoff를 이용하는 제한된 Kelly식 휴리스틱입니다. 최적 비중을 입증하지 않습니다.
+- 20개 관측마다 완료 종가로 목표 비중을 계산합니다. `build_engine`은 이후 거래 가능한 관측 시가에서 주문을 실행합니다. 개별 `run_backtest`에 시가를 전달하지 않으면 이후 관측 종가 체결을 사용합니다.
+- 주식 수량과 현금을 추적합니다. 재조정 사이에는 수량을 유지하므로 실제 비중이 가격에 따라 변합니다. 목표 종목 비중 상한은 10%, 목표 gross exposure 상한은 기본 150%입니다. 연속적인 실시간 비중 보장은 아닙니다.
+- 거래량이 0인 날은 매매하지 않습니다. 기본 편도 비용 10bp와 연 3% 차입 가정을 반영합니다. 비용은 실제 중개사 수수료가 아닌 연구 설정입니다.
+- 종료 시 보유 자산을 마지막 종가로 평가합니다. 가상의 최종 청산은 하지 않습니다. `trade_ledger`, `realized_weights`, `execution`을 결과에 포함합니다.
+- 파라미터 스윕은 같은 수량 회계와 실행 가격을 사용합니다. 순위는 in-sample 결과이며 독립 미래 성능 검증이 아닙니다.
 
-## Runtime and validation
+## 모듈
 
-To verify the engine without downloading live market data, run the regression suite from the project folder.
+| 파일 | 역할 |
+|---|---|
+| data_loader.py | 다운로드 정규화, 관측 가격 정렬, FX 환산 |
+| indicators.py | 과거 일봉 특징과 규칙 신호 |
+| risk.py | 신호 payoff 기반 크기 휴리스틱과 목표 노출 제한 |
+| accounting.py | 다음 관측 체결, 수량·현금·비용·차입 회계 |
+| backtest.py | 주기적 목표 생성과 성과 집계 |
+| benchmark.py | 공통 날짜 benchmark 비교와 파라미터 스윕 |
+| engine.py | 전체 실행 연결 |
 
-macOS / Linux:
+`build_engine`에서 종목·기간·자본·노출 상한을 지정합니다. `config.yaml`은 예전 예제이며 현재 실행기가 읽지 않습니다.
+
+## 테스트
 
 ```bash
 .venv/bin/python -m pip install -e ".[test]"
 .venv/bin/python -m pytest -q
 ```
 
-Windows PowerShell:
+Windows는 `.\.venv\Scripts\python.exe`로 바꿉니다. GitHub Actions는 pandas 2와 3에서 데이터 형식, 인과성, 가격 정렬, 수량 유지, 비용, 거래 가능일, FX와 네 개 예제 실행/PNG 생성을 검사합니다. 실제 시세 대신 mock 응답을 사용합니다.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
-.\.venv\Scripts\python.exe -m pytest -q
-```
+## 해석 범위
 
-GitHub Actions runs the offline regression suite on Python 3.10/pandas 2 and Python 3.12/pandas 3, including all four example scripts and chart generation. Live runs require Yahoo Finance access; failed downloads are reported per ticker, and an entirely empty download raises an error containing the available failure reasons.
+서로 다른 시장의 일봉 종가·시가가 실제로 동시에 형성되는 것은 아닙니다. FX 일봉 환산과 달력별 노출은 일별 근사 모델이며 동시각 intraday USD 체결을 재현하지 않습니다. Sharpe 등은 252-period 가정이어서 혼합 달력 해석에 주의가 필요합니다.
 
-Kelly sizing uses expanding history with a 20-observation warmup. Target allocations stay within 10% per asset and the gross leverage ceiling; low conviction can leave capital uninvested. Missing prices are carried forward only, and the panel starts after every included asset has an observed price. Benchmark comparison compounds strategy returns between shared market dates. Parameter sweeps use the same 20-observation rebalance schedule as the main backtest.
-
-This is a research backtester: positions are target weights held between signal updates, not a broker execution simulator. Transaction costs, borrow fees, FX conversion and cash interest are not modeled. Metrics use a 252-period annualization convention, so mixed crypto/equity daily calendars require care when interpreting annualized values. Parameter rankings are in-sample, not an out-of-sample performance guarantee. `config.yaml` is a legacy example and is not consumed by the current engine; pass runtime options to `build_engine` instead.
-
-## Architecture
-
-```
-Market Data (yfinance)
-       ↓
-Feature Engineering (10+ technical indicators)
-       ↓
-Multi-factor Signal Generation (4-factor composite)
-       ↓
-Position Sizing (Kelly Criterion + leverage constraints)
-       ↓
-Portfolio Simulation (daily P&L tracking)
-       ↓
-Performance Reporting (15+ metrics)
-       ↓
-Benchmark Comparison (vs S&P 500: Alpha/Beta)
-       ↓
-Parameter Optimization (identify robust configurations)
-```
-
-## Core modules
-
-**data_loader.py**  
-Fetch real market data from yfinance. Handles US stocks, Korean equities, crypto, and commodities with automatic alignment to common trading dates.
-
-**indicators.py**  
-Technical indicators: SMA, EMA, RSI, MACD, Bollinger Bands, momentum, mean reversion scoring.
-
-**risk.py**  
-Kelly Criterion for optimal position sizing. Sharpe, Sortino, Calmar ratio computation. Volatility and drawdown analysis.
-
-**backtest.py**  
-Simulate strategy over historical data with daily rebalancing, leverage limits, and position constraints.
-
-**benchmark.py**  
-Compare strategy returns vs S&P 500. Calculate Alpha and Beta. Run parameter sweep to identify optimal configurations.
-
-**engine.py**  
-Orchestration layer that ties data, signals, sizing, and backtesting into a unified pipeline.
-
-## Key results explained
-
-**Sharpe Ratio** (target > 1.0)  
-Return per unit of risk. Higher is better. Above 1.5 is excellent.
-
-**Sortino Ratio** (target > 1.5)  
-Return per unit of downside risk. Better than Sharpe for strategies focused on loss prevention.
-
-**Max Drawdown**  
-Largest peak-to-trough decline. Shows the worst-case scenario during the backtest.
-
-**Calmar Ratio** (target > 0.5)  
-Annual return divided by max drawdown. Measures efficiency of returns relative to peak losses.
-
-**Win Rate**  
-% of profitable days. Above 55% is solid; above 60% is excellent.
-
-**Profit Factor**  
-Gross profit / gross loss. Above 1.5 is good; above 2.0 is excellent.
-
-**Alpha**  
-Return generated beyond what market beta would predict. Positive alpha indicates skill.
-
-**Beta**  
-Correlation with market. Beta=1.0 means strategy moves with S&P 500. Beta<1.0 means lower correlation.
-
-## Technical approach
-
-### Signal Generation
-
-Combines four independent factors into a composite score:
-
-1. **Momentum** (35% weight): Trend following. Captures persistent price movements.
-2. **Mean Reversion** (25% weight): Contrarian. Exploits oversold/overbought conditions.
-3. **RSI** (20% weight): Overbought/oversold detector using Relative Strength Index.
-4. **Price Position** (20% weight): Price location relative to 50-day moving average.
-
-Signals range from -1 (strong sell) to +1 (strong buy).
-
-### Position Sizing
-
-Uses **fractional Kelly Criterion** for optimal bet sizing:
-
-```
-f* = (bp - q) / b, capped at 25% for safety
-```
-
-Where:
-- b = average win / average loss
-- p = historical win rate  
-- q = 1 - p
-
-Positions are capped at 10% per symbol and 150% total leverage to manage risk.
-
-### Risk Management
-
-- **Position limits**: Maximum 10% of capital per symbol
-- **Leverage cap**: 150% total exposure
-- **Rebalancing**: Every 20 trading days
-- **Constraints**: No concentrated bets, diversification across asset classes
-
-### Parameter Optimization
-
-The system sweeps momentum window (10-30 days) and mean reversion window (20-50 days) to identify configurations that maximize Sharpe ratio while maintaining reasonable returns. Top 5 configurations are ranked and reported.
-
-## Stack
-
-Python • pandas • numpy • scipy • matplotlib • yfinance • scikit-learn
-
-## License
-
-MIT
-
----
-
-### 한국어
-
-# quantitative-trading-engine
-
-주식, 암호화폐, 원자재, 지수를 대상으로 하는 Python 백테스터입니다. yfinance로 과거 가격을 받아 매매 신호와 투자 비중을 계산하고, 전략 수익률을 벤치마크와 비교합니다.
-
-## 개요
-
-예제에서 사용하는 자산은 다음과 같습니다.
-- 미국주: AAPL, MSFT, GOOGL, AMZN, NVDA, TSLA, META
-- 한국주: 삼성전자, LG전자, SK하이닉스, 카카오
-- 암호화폐: BTC, ETH
-- 실물자산: 금, 석유, 상품지수
-- 지수: SPY, QQQ
-
-## 주요 기능
-
-- **멀티팩터 신호**: 모멘텀 + 평균 회귀 + RSI + 가격 추세
-- **켈리 포지션 사이징**: 과거 승률과 평균 이익·손실을 바탕으로 투자 비중 계산
-- **실제 시장 데이터**: 10년 yfinance 데이터 (모든 자산군)
-- **벤치마크 비교**: S&P 500 대비 성과 (Alpha, Beta)
-- **파라미터 비교**: 신호 설정을 바꿔가며 백테스트 결과 비교
-- **리스크 관리**: 레버리지 한도, 낙폭 추적, 샤프/소르티노/칼마 지수
-- **정기 리밸런싱**: 20일마다 자동 포트폴리오 조정
-
-## 실행
-
-Git, Python 3.10 이상, Yahoo Finance에 접근 가능한 인터넷 연결이 필요합니다. 터미널에 **코드 블록 안의 명령만** 순서대로 붙여넣으세요. 가상환경의 Python을 직접 사용하므로 별도의 활성화 명령은 필요하지 않습니다.
-
-### macOS / Linux
-
-프로젝트를 처음 내려받는 경우:
-
-```bash
-git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
-cd quantitative-trading-engine
-python3 -m venv .venv
-.venv/bin/python -m pip install -e .
-.venv/bin/python examples/run_backtest.py
-```
-
-이미 내려받았다면 해당 프로젝트 폴더에서 터미널을 열고 `git pull origin main`을 실행한 뒤, 위 명령 중 `python3 -m venv .venv`부터 진행하세요. 프로젝트 폴더에는 `README.md`, `pyproject.toml`, `examples/`가 있습니다.
-
-기본 백테스트가 완료되면 벤치마크·파라미터 분석을 실행합니다.
-
-```bash
-.venv/bin/python examples/comprehensive_analysis.py
-```
-
-차트를 생성합니다.
-
-```bash
-.venv/bin/python examples/visualize_comprehensive.py
-```
-
-### Windows PowerShell
-
-프로젝트를 처음 내려받는 경우:
-
-```powershell
-git clone https://github.com/yokioryonghee/quantitative-trading-engine.git
-cd quantitative-trading-engine
-py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe examples/run_backtest.py
-```
-
-이미 내려받았다면 해당 프로젝트 폴더에서 `git pull origin main`을 실행한 뒤 `py -3 -m venv .venv`부터 진행하세요.
-
-```powershell
-.\.venv\Scripts\python.exe examples/comprehensive_analysis.py
-.\.venv\Scripts\python.exe examples/visualize_comprehensive.py
-```
-
-기본 실행은 데이터 다운로드 진행 상황과 성과 요약을 출력합니다. 벤치마크·파라미터 분석은 데이터를 확보한 경우 벤치마크 비교와 파라미터 순위를 추가로 출력합니다. 차트는 프로젝트 폴더에 `backtest_comprehensive_analysis.png`로 저장되고 그래프 창이 열립니다. GUI가 없는 macOS/Linux 환경에서는 `MPLBACKEND=Agg .venv/bin/python examples/visualize_comprehensive.py`를 사용하세요.
-
-### 실행 오류 해결
-
-- **PEP 668 / `externally-managed-environment`:** 위의 `.venv` Python으로 설치하세요. Homebrew나 운영체제의 Python에 직접 설치할 필요가 없으며 `--break-system-packages`도 필요하지 않습니다.
-- **`can't open file ... examples/...`:** 홈 폴더가 아닌 프로젝트 폴더에서 실행하세요. 해당 폴더에 `examples/run_backtest.py`가 있는지 확인하세요.
-- **zsh의 `command not found: #` 등:** 설명 문장 대신 코드 블록 안의 명령만 복사하세요. 위 명령 블록에는 셸 주석을 넣지 않았습니다.
-- **`No data fetched`:** 종목별 다운로드 오류를 확인하세요. 인터넷 연결, Yahoo Finance 접근 제한이나 요청 횟수 제한으로 실제 시세 다운로드가 실패할 수 있습니다.
-
-### 실제 시세 다운로드 없이 검증
-
-프로젝트 폴더에서 테스트를 실행할 수 있습니다. 테스트에는 예제 실행과 차트 생성 검증이 포함됩니다.
-
-macOS / Linux:
-
-```bash
-.venv/bin/python -m pip install -e ".[test]"
-.venv/bin/python -m pytest -q
-```
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e ".[test]"
-.\.venv\Scripts\python.exe -m pytest -q
-```
-
-## 아키텍처
-
-```
-시장 데이터 (yfinance)
-     ↓
-특성 엔지니어링 (10+ 기술지표)
-     ↓
-멀티팩터 신호 생성 (4-팩터 복합)
-     ↓
-포지션 사이징 (켈리 기준 + 제약)
-     ↓
-포트폴리오 시뮬레이션 (일일 손익)
-     ↓
-성과 리포팅 (15+ 지표)
-     ↓
-벤치마크 비교 (S&P 500 대비)
-     ↓
-파라미터 최적화 (견고한 설정 식별)
-```
-
-## 핵심 모듈
-
-**data_loader.py**  
-Yfinance에서 실제 시장 데이터를 가져온다. 미국주, 한국주, 암호화폐, 실물자산을 지원하며 공통 거래일로 자동 정렬한다.
-
-**indicators.py**  
-기술지표: SMA, EMA, RSI, MACD, 볼린저밴드, 모멘텀, 평균 회귀 점수.
-
-**risk.py**  
-켈리 기준 포지션 사이징. 샤프, 소르티노, 칼마 지수. 변동성 및 낙폭 분석.
-
-**backtest.py**  
-일일 리밸런싱, 레버리지 한도, 포지션 제약과 함께 과거 데이터 시뮬레이션.
-
-**benchmark.py**  
-S&P 500 대비 전략 수익률 비교. Alpha/Beta 계산. 최적 설정 식별을 위한 파라미터 스윕.
-
-**engine.py**  
-데이터, 신호, 사이징, 백테스트를 통합 파이프라인으로 연결하는 조율 계층.
-
-## 주요 지표 설명
-
-**샤프 지수** (목표 > 1.0)  
-위험 대비 수익. 높을수록 좋다. 1.5 이상이면 우수.
-
-**소르티노 지수** (목표 > 1.5)  
-하방 리스크만 고려한 수익. 손실 방지에 초점 맞춘 전략에 더 적합.
-
-**최대 낙폭**  
-피크에서 저점까지의 가장 큰 하락. 백테스트 기간의 최악의 경우.
-
-**칼마 지수** (목표 > 0.5)  
-연 수익 / 최대 낙폭. 피크 손실 대비 수익 효율성.
-
-**승률**  
-수익 거래일의 비율. 55% 이상이면 견고, 60% 이상이면 우수.
-
-**수익 계수**  
-총 수익 / 총 손실. 1.5 이상이면 좋음, 2.0 이상이면 우수.
-
-**알파**  
-시장 베타가 예측한 수익을 초과한 부분. 양수는 전략의 실력을 나타낸다.
-
-**베타**  
-S&P 500과의 상관성. 1.0 = 시장과 동반, <1.0 = 시장 독립성 높음.
-
-## 기술적 접근
-
-### 신호 생성
-
-4개 독립 팩터를 복합 점수로 결합:
-
-1. **모멘텀** (35% 가중): 추세 추종. 지속적 가격 움직임 포착.
-2. **평균 회귀** (25% 가중): 반발. 과매도/과매수 상태 활용.
-3. **RSI** (20% 가중): RSI로 과매도/과매수 감지.
-4. **가격 위치** (20% 가중): 50일 이동평균 대비 가격 위치.
-
-신호 범위: -1 (강한 매도) ~ +1 (강한 매수).
-
-### 포지션 사이징
-
-**분할 켈리 기준** 사용:
-
-```
-f* = (bp - q) / b, 안전을 위해 25% 한도
-```
-
-주요 용어:
-- b = 평균 승리 / 평균 손실
-- p = 과거 승률
-- q = 1 - p
-
-포지션은 종목당 10%, 전체 레버리지 150%로 제한.
-
-### 리스크 관리
-
-- **포지션 한도**: 종목당 최대 자본의 10%
-- **레버리지 한도**: 총 노출 150%
-- **리밸런싱**: 20거래일마다
-- **제약**: 집중 회피, 자산군 다각화
-
-### 파라미터 최적화
-
-모멘텀 윈도우(10-30일)와 평균 회귀 윈도우(20-50일)를 스윕해 샤프 지수를 최대화하면서 합리적 수익을 유지하는 설정을 식별한다.
-
-## 기술 스택
-
-Python • pandas • numpy • scipy • matplotlib • yfinance • scikit-learn
+현재 종목 목록은 과거 시점의 생존 편향 없는 유니버스가 아닙니다. 실제 수익성, 주문/체결, 시장 충격, 차입 가능 수량, 계좌 동기화와 운영 안정성은 별도 검증해야 합니다.

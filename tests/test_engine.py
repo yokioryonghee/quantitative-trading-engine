@@ -71,7 +71,7 @@ def test_limits_and_causality(prices):
 
 
 def test_backtest_prefix_and_rebalancing(prices):
-    volume = prices * 0
+    volume = prices * 0 + 100
     result = backtest.run_backtest(prices, volume)
     changed = prices.copy()
     changed.iloc[150:] *= .5
@@ -79,7 +79,8 @@ def test_backtest_prefix_and_rebalancing(prices):
     pd.testing.assert_series_equal(result['returns'].iloc[:150], altered['returns'].iloc[:150])
     positions = result['positions']
     changes = positions.sub(positions.shift(1).fillna(0)).abs().gt(1e-12)
-    assert result['num_trades'] == int(changes.sum().sum()) > 0
+    assert result['num_trades'] == len(result['trade_ledger']) > 0
+    assert all(prices.index.get_loc(row['date']) % 20 == 1 for row in result['trade_ledger'])
     assert all(i % 20 == 0 for i in np.flatnonzero(changes.any(axis=1)))
 
 
@@ -105,6 +106,9 @@ def test_examples_run_offline(monkeypatch, tmp_path, prices, script):
     import matplotlib.pyplot as plt
     def download(symbol, **kwargs):
         close = prices['SPY']
+        if symbol == 'KRW=X':
+            dates=pd.bdate_range(close.index.min()-pd.Timedelta(days=10),close.index.max())
+            close=pd.Series(1000.,index=dates)
         return pd.DataFrame({'Open': close, 'Close': close, 'High': close, 'Low': close, 'Volume': 100}, index=close.index)
     monkeypatch.setattr(data_loader.yf, 'download', download)
     monkeypatch.setattr(plt, 'show', lambda: None)
@@ -114,3 +118,4 @@ def test_examples_run_offline(monkeypatch, tmp_path, prices, script):
     if script.startswith('visualize'):
         assert list(tmp_path.glob('*.png'))
     plt.close('all')
+

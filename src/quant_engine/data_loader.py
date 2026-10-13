@@ -39,6 +39,7 @@ def fetch_market_data(
     symbols: list[str],
     start_date: str | None = None,
     end_date: str | None = None,
+    strict: bool = True,
 ) -> pd.DataFrame:
     """
     Fetch real market data from yfinance with robust error handling.
@@ -58,8 +59,10 @@ def fetch_market_data(
     
     print(f"Fetching data for {len(symbols)} symbols from {start_date} to {end_date}...")
     
-    if not symbols:
-        raise ValueError("At least one symbol is required")
+    if not symbols or len(set(symbols)) != len(symbols):
+        raise ValueError("Nonempty unique symbols required")
+    if pd.Timestamp(start_date) >= pd.Timestamp(end_date):
+        raise ValueError("Start date must precede end date")
     data_list = []
     failures = []
     successful_symbols = []
@@ -97,6 +100,7 @@ def fetch_market_data(
                 successful_symbols.append(symbol)
                 print(f"✓ {symbol}")
             else:
+                failures.append(f"{symbol}: no valid price data")
                 print(f"✗ {symbol}: No valid price data")
                 
         except Exception as e:
@@ -106,6 +110,9 @@ def fetch_market_data(
     if not data_list:
         raise ValueError("No data fetched: " + "; ".join(failures))
     
+    if strict and failures:
+        raise ValueError("Incomplete market universe: " + "; ".join(failures))
+
     # Concatenate all data
     aligned_data = pd.concat(data_list, ignore_index=True)
     
@@ -121,7 +128,7 @@ def fetch_market_data(
 
 def get_optimal_universe() -> list[str]:
     """
-    Return best-performing assets across all classes for this backtest.
+    Return the fixed example universe; this is not an optimized or survivorship-free universe.
     """
     symbols = []
     for asset_class, tickers in ASSET_UNIVERSE.items():
@@ -162,3 +169,24 @@ def prepare_panel_data(df: pd.DataFrame) -> tuple:
         raise ValueError(f"Insufficient data: only {len(pivot_close)} trading days available (need at least 100)")
     
     return pivot_close, pivot_volume, pivot_open
+
+
+
+def convert_to_usd(raw):
+    """Convert Korean OHLC quotes to USD using observed USD/KRW daily FX."""
+    korean=raw.Symbol.astype(str).str.endswith(('.KS','.KQ'))
+    if not korean.any(): return raw
+    start=(raw.loc[korean,'Date'].min()-pd.Timedelta(days=10)).strftime('%Y-%m-%d')
+    end=(raw.loc[korean,'Date'].max()+pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+    downloaded=yf.download('KRW=X',start=start,end=end,progress=False,auto_adjust=True,multi_level_index=False,timeout=20)
+    if downloaded is None or downloaded.empty: raise ValueError('USD/KRW FX required for Korean assets')
+    fx=normalize_download(downloaded,'KRW=X')['close'].sort_index()
+    dates=pd.DatetimeIndex(raw.loc[korean,'Date'])
+    prior=fx.index.searchsorted(dates,side='left')-1
+    if (prior<0).any(): raise ValueError('A prior observed FX rate is required')
+    rates=fx.iloc[prior].to_numpy()
+    if not np.isfinite(rates).all() or (rates<=0).any(): raise ValueError('Missing/invalid observed FX rates')
+    result=raw.copy()
+    for field in ['Open','High','Low','Close']:
+        result.loc[korean,field]=result.loc[korean,field].to_numpy()/rates
+    return result

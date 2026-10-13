@@ -128,13 +128,14 @@ def allocate_positions_optimal(
     Returns:
         DataFrame with position sizes (as % of capital) for each asset.
     """
-    if target_leverage < 0 or not 0 < max_position_size <= 1:
+    if not np.isfinite([target_leverage,max_position_size]).all() or target_leverage < 0 or not 0 < max_position_size <= 1:
         raise ValueError("Invalid leverage or position limit")
     if not signals.index.equals(returns.index) or not signals.columns.equals(returns.columns):
         raise ValueError("Signals and returns must have matching dates and symbols")
     positions = pd.DataFrame(0.0, index=signals.index, columns=signals.columns)
     for symbol in signals.columns:
-        ret = returns[symbol]
+        # Heuristic signal-conditioned historical payoffs, not optimal Kelly proof.
+        ret = returns[symbol] * signals[symbol].shift(1).fillna(0)
         # Expanding statistics contain only observations available at this close.
         # The backtest executes these target weights on the following interval.
         count = ret.notna().cumsum()
@@ -154,3 +155,4 @@ def allocate_positions_optimal(
     exposure = positions.abs().sum(axis=1)
     scale = (target_leverage / exposure.replace(0, np.nan)).clip(upper=1).fillna(1)
     return positions.mul(scale, axis=0)
+

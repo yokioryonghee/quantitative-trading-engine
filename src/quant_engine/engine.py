@@ -43,6 +43,9 @@ def build_engine(
     raw_data = fetch_market_data(symbols, start_date, end_date)
     print(f"✓ Data fetched: {len(raw_data)} rows")
     
+    from quant_engine.data_loader import convert_to_usd
+    raw_data = convert_to_usd(raw_data)
+
     # Prepare panel data
     print(f"\n[2/4] Preparing panel data...")
     prices, volume, open_prices = prepare_panel_data(raw_data)
@@ -55,14 +58,15 @@ def build_engine(
         volume,
         initial_capital=initial_capital,
         target_leverage=target_leverage,
+        open_prices=open_prices,
     )
     print(f"✓ Backtest complete")
     
     # Print summary
     print(f"\n[4/4] Results Summary")
     print("="*70)
-    print(f"Initial Capital:        ${initial_capital:,.0f}")
-    print(f"Final Value:            ${results['final_value']:,.0f}")
+    print(f"Initial Capital:        {initial_capital:,.0f} USD")
+    print(f"Final Value:            USD {results['final_value']:,.0f}")
     print(f"Total Return:           {results['total_return']*100:,.2f}%")
     print(f"Annualized Return:      {results['annual_return']*100:,.2f}%")
     print(f"\nRisk Metrics:")
@@ -77,3 +81,4 @@ def build_engine(
     print("="*70 + "\n")
     
     return results
+
